@@ -54,31 +54,27 @@ async def sdp(websocket, path):
     async def watch(sub_id, query): 
         connection = await get_connection()
         
-        feed = await querychanges(include_states=True, include_initial=True).run(connection)
+        feed = await query.changes(include_states=True, include_initial=True).run(connection)
         while (await feed.fetch_next()):
             item = await feed.next()
-            
+            print(item)
             state = item.get('state')
             if state == 'ready':
-                send_ready(sub_id)
+                await send_ready(sub_id)
             elif state == 'initializing':
-                send_initializing(sub_id)
+                await send_initializing(sub_id)
             else:
                 if item.get('old_val') is None:
-                   send_added(sub_id, item['new_val'])
+                    await send_added(sub_id, item['new_val'])
                 elif item.get('new_val') is None: 
-                    send_removed(sub_id, item['old_val']['id'])
+                    await send_removed(sub_id, item['old_val']['id'])
                 else:
-                    send_changed(sub_id, item['new_val'])            
+                    await send_changed(sub_id, item['new_val'])            
 
     async def send(data):
         def helper(x):
             if isinstance(x, datetime):
                 return {'$date': x.timestamp()*1000}
-            elif isinstance(x, ObjectId):
-                return str(x)
-            elif isinstance(x, Timestamp):
-                return x.time
             else:
                 return x
         message = json.dumps(data, default=helper)
@@ -91,13 +87,9 @@ async def sdp(websocket, path):
         await send({'msg': 'error', 'id': id, 'error': error})
 
     async def send_added(sub_id, doc):
-        doc['id'] = doc['_id']
-        del doc['_id']
         await send({'msg': 'added', 'id': sub_id, 'doc': doc})
 
     async def send_changed(sub_id, doc):
-        doc['id'] = doc['_id']
-        del doc['_id']
         await send({'msg': 'changed', 'id': sub_id, 'doc': doc})
 
     async def send_removed(sub_id, doc_id):
@@ -164,10 +156,13 @@ async def sdp(websocket, path):
                         await send_nosub(id, 'sub does not exist')
                     else:
                         query = subs[id](user_id, **params)
-                        registered_feeds[id] = asyncio.create_task(watch(id, query))
+                        #registered_feeds[id] = asyncio.create_task(watch(id, query))
+                        registered_feeds[id] = get_event_loop().create_task(watch(id, query))
+                        await send_ready(id)
                 elif message == 'unsub':
-                    feed = registered_feeds[id]
-                    feed.cancel()
+                    if id in registered_feeds.keys():
+                        feed = registered_feeds[id]
+                        feed.cancel()
                     #if remove_observer_from_item.get(id):
                     #    for remove in remove_observer_from_item[id].values():
                     #        remove()

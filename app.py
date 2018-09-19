@@ -1,8 +1,10 @@
 import asyncio
 import websockets
-from sdp import sdp, method, sub, get_connection
+from sdp import sdp, method, sub
 from schema import Schema, public, never, CURRENT_USER
 from rethinkdb import r
+
+r.set_loop_type("asyncio")
 
 class XSchema(Schema):
     table = 'test'
@@ -10,7 +12,7 @@ class XSchema(Schema):
         "__set_default": public,
         'x': {
             'type': int,
-            'validation': lambda v: v > -1000
+            'validation': lambda v: v > -100
         },
         'user_id': {
             'type': str,
@@ -28,21 +30,18 @@ class XSchema(Schema):
 @method
 async def add(user_id, a, b):
     doc = XSchema(doc={'x': 3}, user_id=user_id)
-    doc = doc.insert()
-    connection = await get_connection()
-    await r.table('test').insert(doc).run(connection)
+    await doc.insert()
     return a + b
 
 @method 
 async def set_x(user_id, id, value):
     doc = XSchema(doc={'id': id, 'x': value}, user_id=user_id)
-    doc = await doc.update()
-    connection = await get_connection()
-    await r.table('test').get(id).update(doc).run(connection)
+    await doc.update()
 
 @sub
 def x_less_than(user_id, max):
-    return r.table('test').filter(lambda row: row['x'] < max and row['user_id'] == user_id)
+    print(user_id, max)
+    return r.table('test').filter(lambda row: (row['x'] < max) & (row['user_id'] == user_id))
 
 def main():
     start_server = websockets.serve(sdp, 'localhost', 8888)
