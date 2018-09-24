@@ -34,6 +34,14 @@ def sub(f):
     subs[f.__name__] = f
     return f
 
+def sub_with_aliases(aliases):
+    def decorator(f):
+        subs[f.__name__] = f
+        for alias in aliases:
+            subs[alias] = f
+        return f
+    return decorator
+
 def check(attr, type):
     if not isinstance(attr, type):
         raise CheckError(attr + ' is not of type ' + str(type))

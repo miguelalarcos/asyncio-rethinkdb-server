@@ -29,9 +29,12 @@ class XSchema(Schema):
 
 @method
 async def add(user_id, a, b):
-    doc = XSchema(doc={'x': 3}, user_id=user_id)
-    await doc.insert()
     return a + b
+
+@method
+async def create_X(user_id, x):
+    doc = XSchema(doc={'x': x}, user_id=user_id)
+    await doc.insert()
 
 @method 
 async def set_x(user_id, id, value):
